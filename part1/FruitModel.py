@@ -72,7 +72,20 @@ class NaiveBayesModel:
 def buildGraph(dim, num_classes, L): #dim: 输入一维向量长度, num_classes:分类数
     # 以下类均需要在BaseNode.py中实现
     # 也可自行修改模型结构
-    nodes = [Attention(dim), relu(), LayerNorm((L, dim)), ResLinear(dim), relu(), LayerNorm((L, dim)), Mean(1), Linear(dim, num_classes), LogSoftmax(), NLLLoss(num_classes)]
+    hidden_dim = dim*2
+    nodes = [
+        LayerNorm((L, dim)), Attention(dim),
+        LayerNorm((L, dim)), Linear(dim, hidden_dim), relu(),
+        ResLinear(hidden_dim),
+                
+        LayerNorm((L, hidden_dim)), Attention(hidden_dim),
+        LayerNorm((L, hidden_dim)), ResLinear(hidden_dim), relu(),
+        
+        Mean(1),
+        Linear(hidden_dim, num_classes),
+        LogSoftmax(),
+        NLLLoss(num_classes)
+    ]
     
     graph = Graph(nodes)
     return graph
@@ -94,8 +107,18 @@ class Embedding():
         # TODO: YOUR CODE HERE
         # 利用self.emb将句子映射为一个二维向量（LxD），注意，同时需要修改训练代码中的网络维度部分
         # 默认长度L为50，特征维度D为100
-        # 提示: 考虑句子如何对齐长度，且可能存在空句子情况（即所有单词均不在emd表内） 
-        raise NotImplementedError
+        # 提示: 考虑句子如何对齐长度，且可能存在空句子情况（即所有单词均不在emd表内）
+
+        D = 100 
+        result = np.zeros((max_len, D))
+        for i, token in enumerate(text):
+            if i >= max_len:
+                break
+            if token in self.emb:
+                result[i] = self.emb[token]
+            # 不在词表中的 token 保持零向量
+        return result
+        
 
 
 class AttentionModel():
@@ -121,22 +144,40 @@ class QAModel():
     def tf(self, word, document):
         # TODO: YOUR CODE HERE
         # 返回单词在文档中的频度
-        # document变量结构请参考fruit.py中get_document()函数
+
+        ret = 0.0
+        tokens = document['document']
         
-        raise NotImplementedError  
+        if len(tokens) == 0:
+            return 0.0
+        for token in tokens:
+            if token==word:
+                ret += 1
+
+        return ret / len(tokens)                
+        # document变量结构请参考fruit.py中get_document()函数
+  
 
     def idf(self, word):
         # TODO: YOUR CODE HERE
         # 返回单词IDF值，提示：你需要利用self.document_list来遍历所有文档
         # 注意python整除与整数除法的区别
-
-        raise NotImplementedError
+        count_docs = len(self.document_list)
+        count_words = 0.0
+        for doc in self.document_list:
+            if word in doc['document']:
+                count_words += 1
+                
+        return np.log10(count_docs/(count_words+1))
+        
     
     def tfidf(self, word, document):
         # TODO: YOUR CODE HERE
         # 返回TF-IDF值
         
-        raise NotImplementedError
+        tf = self.tf(word, document)
+        idf = self.idf(word)
+        return tf*idf
 
     def __call__(self, query):
         query = tokenize(query) # 将问题token化
@@ -145,8 +186,34 @@ class QAModel():
         # 提示：你需要根据TF-IDF值来选择一个最合适的文档，再根据IDF值选择最合适的句子
         # 返回时请返回原本句子，而不是token化后的句子，可以参考README中数据结构部分以及fruit.py中用于数据处理的get_document()函数
         
-        raise NotImplementedError
-
+        
+        if len(query) == 0:
+            return ""
+        
+        best_doc_idx = 0
+        best_doc_score = -1
+        for i, doc in enumerate(self.document_list):
+            score = 0
+            for word in query:
+                score += self.tfidf(word, doc)
+            if score > best_doc_score:
+                best_doc_score = score
+                best_doc_idx = i
+                
+        best_doc = self.document_list[best_doc_idx]
+        
+        best_pass_idx = 0
+        best_pass_score = -1
+        for i, (tokens, text) in enumerate(best_doc['sentences']):
+            score = 0
+            for word in query :
+                if word in tokens:
+                    score += self.idf(word) 
+            if score > best_pass_score:
+                best_pass_score = score
+                best_pass_idx = i
+        return best_doc['sentences'][best_pass_idx][1]
+    
 modeldict = {
     "Null": NullModel,
     "Naive": NaiveBayesModel,
@@ -173,7 +240,7 @@ if __name__ == '__main__':
     # 完整训练集训练有点慢
     best_train_acc = 0
     dataloader = traindataset(shuffle=True) # 完整训练集
-    #dataloader = minitraindataset(shuffle=True) # 用来调试的小训练集
+    # dataloader = minitraindataset(shuffle=True) # 用来调试的小训练集
     for i in range(1, max_epoch+1):
         hatys = []
         ys = []
