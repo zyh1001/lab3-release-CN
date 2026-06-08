@@ -72,20 +72,15 @@ class NaiveBayesModel:
 def buildGraph(dim, num_classes, L): #dim: 输入一维向量长度, num_classes:分类数
     # 以下类均需要在BaseNode.py中实现
     # 也可自行修改模型结构
-    # hidden_dim = dim*2
+
     nodes = [
-        # Block 1
+
         LayerNorm((L, dim)), Attention(dim),
         LayerNorm((L, dim)), ResLinear(dim), relu(),
-        # Block 2
-        LayerNorm((L, dim)), Attention(dim),
-        LayerNorm((L, dim)), ResLinear(dim), relu(),
-        
+      
         Mean(1),
-        # 加厚分类头
-        Linear(dim, 32),
-        relu(),
-        Linear(32, num_classes),
+        BatchNorm(dim),
+        Linear(dim, num_classes),
         
         LogSoftmax(),
         NLLLoss(num_classes)
@@ -95,7 +90,7 @@ def buildGraph(dim, num_classes, L): #dim: 输入一维向量长度, num_classes
     return graph
 
 
-save_path = "model/attention.npy"
+save_path = "model/attention2.npy"
 
 class Embedding():
     def __init__(self):
@@ -232,7 +227,7 @@ if __name__ == '__main__':
     wd1 = 1e-4  # L1正则化
     wd2 = 2e-3  # L2正则化
     batchsize = 64
-    max_epoch = 10
+    max_epoch = 12
     
     max_L = 50
     num_classes = 2
