@@ -63,7 +63,6 @@ class Graph(List):
             print("backward debug end")
         return grad
         
-        raise NotImplementedError
     
     def optimstep(self, lr, wd1, wd2):
         """

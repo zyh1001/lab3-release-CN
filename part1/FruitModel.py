@@ -90,7 +90,7 @@ def buildGraph(dim, num_classes, L): #dim: 输入一维向量长度, num_classes
     return graph
 
 
-save_path = "model/attention2.npy"
+save_path = "model/attention.npy"
 
 class Embedding():
     def __init__(self):
@@ -115,7 +115,7 @@ class Embedding():
                 break
             if token in self.emb:
                 result[i] = self.emb[token]
-            # 不在词表中的 token 保持零向量
+           
         return result
         
 
